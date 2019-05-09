@@ -1,0 +1,12 @@
+[
+    {
+      "id": 1,
+      "Database": "Mysql",
+      "UserName": "Test",
+      "Password": "Password12345",
+      "HostName": "Test",
+      "Port": 3306,
+      "ServiceName": "TRM"
+    }
+  ]
+  

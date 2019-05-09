@@ -8,6 +8,6 @@ public class DQController {
 
 	@RequestMapping(value = "/")
     public String index() {
-        return "index.html";
+        return "/public/index.html";
     }
 }
