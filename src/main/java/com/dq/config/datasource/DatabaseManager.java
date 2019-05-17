@@ -135,7 +135,7 @@ public class DatabaseManager {
 			ds.setUrl(env.getProperty(URL+dbType.getDbName())+ "/" +schemaName);
 			ds.setUsername(env.getProperty(USERNAME+dbType.getDbName()));
 			ds.setPassword(env.getProperty(PASSWORD+dbType.getDbName()));
-			ds.setSchema(schemaName);
+			//ds.setSchema(schemaName);
 			break;
 
 		default:

@@ -21,7 +21,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <java.version>1.8</java.version>
     </properties>
     <dependencies>
-        <dependency>
+	    <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jooq</artifactId>
         </dependency>
@@ -44,9 +44,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 			<artifactId>mysql-connector-java</artifactId>
 			<version>5.1.46</version>
 		</dependency>
-		
 		<dependency>
-            <groupId>javax</groupId>
+		    <groupId>javax</groupId>
             <artifactId>javaee-web-api</artifactId>
             <version>7.0</version>
         </dependency>
@@ -171,7 +170,66 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 			        </execution>
 			    </executions>
 			</plugin>
-			
+			<!-- The jOOQ code generator plugin -->
+            <plugin>
+                <groupId>org.jooq</groupId>
+                <artifactId>jooq-codegen-maven</artifactId>
+                <version>3.8.3</version>
+
+                <executions>
+                    <execution>
+                        <id>generate-oracle</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <jdbc>
+                                <driver>${driver-class.rds}</driver>
+                                <url>${url.rds}</url>
+                                <user>${username.rds}</user>
+                                <password>${password.rds}</password>
+                            </jdbc>
+                            <generator>
+                                <database>
+                                    <name>org.jooq.meta.oracle.OracleDatabase</name>
+                                    <includes>
+                                        # Generate the complete SP user
+                                        SP\..*
+
+                                        # Generate only parts of the geospatial API
+                                      | MDSYS\.SDO_GEOM.*?
+                                    </includes>
+
+                                    <!-- Known issue with this type: https://github.com/jOOQ/jOOQ/issues/3709 -->
+                                    <excludes>ST_ANNOTATIONTEXTELEMENT|.*\$.*</excludes>
+                                    <dateAsTimestamp>true</dateAsTimestamp>
+                                    <schemata>
+                                        <schema>
+                                            <inputSchema>${schema.rds}</inputSchema>
+                                        </schema>
+                                    </schemata>
+                                </database>
+                                <generate>
+                                    <deprecated>false</deprecated>
+                                </generate>
+                                <target>
+                                    <packageName>com.dq.${schema.rds}.model</packageName>
+                                    <directory>src/main/java</directory>
+                                </target>
+                            </generator>
+                        </configuration>
+                    </execution>
+                </executions>
+
+                <dependencies>
+                    <dependency>
+					<groupId>com.oracle</groupId>
+					<artifactId>ojdbc7</artifactId>
+					<version>12.1.0.1</version>
+				</dependency>
+                </dependencies>
+            </plugin>
 			<!-- <plugin>
 				<groupId>org.jooq</groupId>
 				<artifactId>jooq-codegen-maven</artifactId>

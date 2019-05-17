@@ -69,8 +69,6 @@ public class MetadataService {
 	public List<String> getTableNames(String dbType, String schemaName) throws SQLException{
 		List<String> tableNames = new ArrayList<>();
 		DataSource ds = dbManager.getDataSource(dbType, schemaName);
-		String url = ((DriverManagerDataSource)ds).getUrl();
-		System.out.println("Connection URL - "+url);
 		Connection con = null;
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
@@ -94,5 +92,33 @@ public class MetadataService {
 			if(con != null) con.close();
 		}
 		return tableNames;
+	}
+	
+	public List<String> getColumnNames(String dbType, String schemaName, String tableName) throws SQLException{
+		List<String> columnNames = new ArrayList<>();
+		DataSource ds = dbManager.getDataSource(dbType, schemaName);
+		Connection con = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		String dbSchemaSelectionStr = "";
+		String columnSelectionStr = "";
+		try {
+			con = ds.getConnection();
+			if(dbType.equals(DB_TYPE.MYSQL.getDbName())) {
+				dbSchemaSelectionStr = "use "+schemaName;
+				columnSelectionStr = "SHOW COLUMNS FROM %s";
+			}
+			pstmt = con.prepareStatement(dbSchemaSelectionStr);
+			pstmt.executeQuery();
+			rs = con.createStatement().executeQuery(String.format(columnSelectionStr, tableName));
+			while(rs.next()) {
+				columnNames.add(rs.getString(1));
+			}
+			
+		} finally {
+			if(rs != null) rs.close();
+			if(con != null) con.close();
+		}
+		return columnNames;
 	}
 }

@@ -56,8 +56,24 @@ public class MetaServiceTest {
 	
 	@Test
 	public void testGetTableNames() throws SQLException {
-		List<String> tables = service.getTableNames("mysql", "DQTRM");
+		List<String> tables = service.getTableNames("mysql", "DQTRAM");
 		assertNotNull(tables);
 		assertTrue(tables.size() > 0);
+		for (String table : tables) {
+			System.out.println("Table name from the schema - "+table);
+		}
+	}
+	
+	@Test
+	public void testGetColumnNames()  throws SQLException  {
+		String schemaName = "DQDEV";
+		String dbType = "mysql";
+		List<String> tables = service.getTableNames(dbType, schemaName);
+		assertNotNull(tables);
+		assertTrue(tables.size() > 0);
+		String tableName = tables.get(0);
+		List<String> columns = service.getColumnNames(dbType, schemaName, tableName);
+		assertNotNull(columns);
+		assertTrue(columns.size() > 0);
 	}
 }
