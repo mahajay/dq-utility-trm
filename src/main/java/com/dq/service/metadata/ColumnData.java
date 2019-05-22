@@ -5,17 +5,18 @@ import java.util.List;
 public class ColumnData {
 
 	private String table;
-	private List<String> columns;
+	private List<Column> columns;
+	
 	public String getTable() {
 		return table;
 	}
 	public void setTable(String table) {
 		this.table = table;
 	}
-	public List<String> getColumns() {
+	public List<Column> getColumns() {
 		return columns;
 	}
-	public void setColumns(List<String> columns) {
+	public void setColumns(List<Column> columns) {
 		this.columns = columns;
 	}
 	

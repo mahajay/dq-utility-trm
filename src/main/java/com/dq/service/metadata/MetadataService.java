@@ -3,17 +3,22 @@ package com.dq.service.metadata;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.sql.DataSource;
 
+import org.jooq.Field;
+import org.jooq.util.mysql.MySQLDataType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.stereotype.Service;
 
 import com.dq.config.datasource.DB_TYPE;
+import com.dq.config.datasource.DQTRAM_TYPE;
+import com.dq.config.datasource.DQTRM_TYPE;
 import com.dq.config.datasource.DatabaseManager;
 
 @Service
@@ -94,31 +99,34 @@ public class MetadataService {
 		return tableNames;
 	}
 	
-	public List<String> getColumnNames(String dbType, String schemaName, String tableName) throws SQLException{
-		List<String> columnNames = new ArrayList<>();
-		DataSource ds = dbManager.getDataSource(dbType, schemaName);
-		Connection con = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		String dbSchemaSelectionStr = "";
-		String columnSelectionStr = "";
-		try {
-			con = ds.getConnection();
-			if(dbType.equals(DB_TYPE.MYSQL.getDbName())) {
-				dbSchemaSelectionStr = "use "+schemaName;
-				columnSelectionStr = "SHOW COLUMNS FROM %s";
-			}
-			pstmt = con.prepareStatement(dbSchemaSelectionStr);
-			pstmt.executeQuery();
-			rs = con.createStatement().executeQuery(String.format(columnSelectionStr, tableName));
-			while(rs.next()) {
-				columnNames.add(rs.getString(1));
-			}
-			
-		} finally {
-			if(rs != null) rs.close();
-			if(con != null) con.close();
+	public List<Column> getColumnNames(String dbType, String schemaName, String tableName) throws SQLException{
+		List<Column> columns = null;
+		Field<?>[] fields = null;
+		
+		if("DQTRAM".equals(schemaName)) {
+			DQTRAM_TYPE dqType = DQTRAM_TYPE.valueOf(tableName.toUpperCase());
+			fields = dqType.getJooqTable().fields();
 		}
-		return columnNames;
+		if("DQTRM".equals(schemaName)) {
+			DQTRM_TYPE dqType = DQTRM_TYPE.valueOf(tableName.toUpperCase());
+			fields = dqType.getJooqTable().fields();
+		}
+
+		columns = retrieveColumnData(tableName, fields);
+		
+		return columns;
 	}
+
+	private List<Column> retrieveColumnData(String tableName, Field<?>[] fields) {
+		List<Column> columns = new ArrayList<>();
+		for (Field<?> field : fields) {
+			Column col = new Column();
+			col.setName(field.getName());
+			col.setTable(tableName);
+			col.setType(field.getType().toString());
+			columns.add(col);
+		}
+		return columns;
+	}
+
 }

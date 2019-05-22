@@ -10,17 +10,19 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.jooq.SQLDialect;
 
 public enum DB_TYPE {
-			MYSQL("mysql");
-			// RDS("rds")
+			MYSQL("mysql", SQLDialect.MYSQL);
 		private List<String> attributes = new ArrayList<>();
 		private static Map<String, DB_TYPE> dbTypeMap = new HashMap<>();
-	
-			DB_TYPE(String name){
+		String dbName;
+		SQLDialect dialect;
+			DB_TYPE(String name, SQLDialect dialect){
 				dbName = name;
+				this.dialect = dialect;
 			}
-			String dbName;
+			
 			public String getDbName() {
 				return dbName;
 			}
@@ -31,6 +33,10 @@ public enum DB_TYPE {
 			
 			public static DB_TYPE getDbType(String dbName) {
 				return dbTypeMap.get(dbName);
+			}
+			
+			public SQLDialect getJooqSqlDialect() {
+				return dialect;
 			}
 			
 			static {

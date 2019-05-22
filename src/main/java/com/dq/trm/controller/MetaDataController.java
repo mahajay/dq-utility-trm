@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
 
 import com.dq.config.datasource.DB_TYPE;
+import com.dq.service.metadata.Column;
 import com.dq.service.metadata.ColumnData;
 import com.dq.service.metadata.Metadata;
 import com.dq.service.metadata.MetadataService;
@@ -82,12 +83,12 @@ public class MetaDataController {
 	public ModelAndView getColumns(@ModelAttribute("SpringWeb") MetaData tableData,
 			ModelMap map) throws SQLException {
 		System.out.println("Inside getColumns method ....");
-		List<String> columns = metaService.getColumnNames(tableData.getDbType().getDbName(), tableData.getSchema(), tableData.getTable());
-		for (String srcColumn : columns) {
+		List<Column> columns = metaService.getColumnNames(tableData.getDbType().getDbName(), tableData.getSchema(), tableData.getTable());
+		for (Column srcColumn : columns) {
 			System.out.println("srcColumn - "+srcColumn);	
 		}
 		
-		tableData.setColumns(columns.toArray(new String[columns.size()]));
+		tableData.setColumns(columns.toArray(new Column[columns.size()]));
 		map.addAttribute("table", tableData.getTable());
 		map.addAttribute("columns", tableData.getColumns());
 		map.addAttribute("dbType", tableData.getDbType().getDbName());
