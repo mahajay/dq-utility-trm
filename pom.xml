@@ -101,6 +101,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 		    <artifactId>commons-io</artifactId>
 		    <version>1.3.2</version>
 		</dependency>
+		<dependency>
+		    <groupId>com.google.code.gson</groupId>
+		    <artifactId>gson</artifactId>
+		    <version>2.8.5</version>
+		</dependency>
     </dependencies>
     
     <build>
@@ -171,7 +176,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 			    </executions>
 			</plugin>
 			<!-- The jOOQ code generator plugin -->
-            <plugin>
+            <!-- <plugin>
                 <groupId>org.jooq</groupId>
                 <artifactId>jooq-codegen-maven</artifactId>
                 <version>3.8.3</version>
@@ -201,7 +206,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                                       | MDSYS\.SDO_GEOM.*?
                                     </includes>
 
-                                    <!-- Known issue with this type: https://github.com/jOOQ/jOOQ/issues/3709 -->
+                                    Known issue with this type: https://github.com/jOOQ/jOOQ/issues/3709
                                     <excludes>ST_ANNOTATIONTEXTELEMENT|.*\$.*</excludes>
                                     <dateAsTimestamp>true</dateAsTimestamp>
                                     <schemata>
@@ -229,7 +234,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 					<version>12.1.0.1</version>
 				</dependency>
                 </dependencies>
-            </plugin>
+            </plugin> -->
+            
 			<!-- <plugin>
 				<groupId>org.jooq</groupId>
 				<artifactId>jooq-codegen-maven</artifactId>
