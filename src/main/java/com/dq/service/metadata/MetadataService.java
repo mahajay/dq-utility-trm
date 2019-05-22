@@ -98,7 +98,7 @@ public class MetadataService {
 		}
 		return tableNames;
 	}
-	
+
 	public List<Column> getColumnNames(String dbType, String schemaName, String tableName) throws SQLException{
 		List<Column> columns = null;
 		Field<?>[] fields = null;
@@ -123,7 +123,7 @@ public class MetadataService {
 			Column col = new Column();
 			col.setName(field.getName());
 			col.setTable(tableName);
-			col.setType(field.getType().toString());
+			col.setType(field.getType().toString().replaceAll("class ", ""));
 			columns.add(col);
 		}
 		return columns;
