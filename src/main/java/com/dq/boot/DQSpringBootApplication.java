@@ -28,6 +28,7 @@ public class DQSpringBootApplication extends SpringBootServletInitializer {
 	}*/
 
 	public static void main(String[] args) {
+		
 		System.setProperty("server.servlet.context-path", "/dq-utility");
 		ApplicationContext ctx = SpringApplication.run(DQSpringBootApplication.class, args);
 		 

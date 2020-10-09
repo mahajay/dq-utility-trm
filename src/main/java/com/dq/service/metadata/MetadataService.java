@@ -112,17 +112,18 @@ public class MetadataService {
 			fields = dqType.getJooqTable().fields();
 		}
 
-		columns = retrieveColumnData(tableName, fields);
+		columns = retrieveColumnData(tableName, fields, schemaName);
 		
 		return columns;
 	}
 
-	private List<Column> retrieveColumnData(String tableName, Field<?>[] fields) {
+	private List<Column> retrieveColumnData(String tableName, Field<?>[] fields, String schema) {
 		List<Column> columns = new ArrayList<>();
 		for (Field<?> field : fields) {
 			Column col = new Column();
 			col.setName(field.getName());
 			col.setTable(tableName);
+			col.setSchema(schema);
 			col.setType(field.getType().toString().replaceAll("class ", ""));
 			columns.add(col);
 		}

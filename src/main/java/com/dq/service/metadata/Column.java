@@ -5,6 +5,8 @@ public class Column {
 	private String name;
 	private String type;
 	private String table;
+	private String schema;
+	
 	public String getName() {
 		return name;
 	}
@@ -23,9 +25,15 @@ public class Column {
 	public void setTable(String table) {
 		this.table = table;
 	}
-	
+	public String getSchema() {
+		return schema;
+	}
+	public void setSchema(String schema) {
+		this.schema = schema;
+	}
 	@Override
 	public String toString() {
-		return "Column [name=" + name + ", type=" + type + ", table=" + table + "]";
-	}	
+		return "Column [name=" + name + ", type=" + type + ", table=" + table + ", schema=" + schema + "]";
+	}
+	
 }

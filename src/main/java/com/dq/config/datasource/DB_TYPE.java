@@ -32,7 +32,7 @@ public enum DB_TYPE {
 			}
 			
 			public static DB_TYPE getDbType(String dbName) {
-				return dbTypeMap.get(dbName);
+				return dbTypeMap.get(dbName.toLowerCase());
 			}
 			
 			public SQLDialect getJooqSqlDialect() {

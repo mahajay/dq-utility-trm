@@ -132,7 +132,7 @@ public class DatabaseManager {
 		switch (dbType) {
 		case MYSQL:
 			ds.setDriverClassName(env.getProperty(DRIVER_CLASS+dbType.getDbName()));
-			ds.setUrl(env.getProperty(URL+dbType.getDbName())+ "/" +schemaName);
+			ds.setUrl(env.getProperty(URL+dbType.getDbName())+ "/" +schemaName+"?useSSL=false");
 			ds.setUsername(env.getProperty(USERNAME+dbType.getDbName()));
 			ds.setPassword(env.getProperty(PASSWORD+dbType.getDbName()));
 			//ds.setSchema(schemaName);

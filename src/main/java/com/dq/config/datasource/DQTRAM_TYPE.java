@@ -4,10 +4,6 @@ import static com.dq.DQTRAM.model.Dqtram.DQTRAM;
 
 import org.jooq.Field;
 import org.jooq.impl.TableImpl;
-import com.dq.DQTRAM.model.tables.TramAm;
-import com.dq.DQTRAM.model.tables.TramPr;
-import com.dq.DQTRAM.model.tables.TramPx;
-import com.dq.DQTRAM.model.tables.TramWp;
 
 public enum DQTRAM_TYPE {
 	

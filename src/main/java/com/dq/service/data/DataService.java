@@ -14,15 +14,14 @@ import org.apache.commons.collections4.map.HashedMap;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.Param;
 import org.jooq.Record;
 import org.jooq.Record1;
-import org.jooq.Result;
 import org.jooq.SelectConditionStep;
 import org.jooq.SelectField;
 import org.jooq.SelectJoinStep;
-import org.jooq.SelectOnStep;
-import org.jooq.TableLike;
 import org.jooq.TableOnConditionStep;
+import org.jooq.TableOnStep;
 import org.jooq.impl.DSL;
 import org.jooq.impl.TableImpl;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,83 +43,169 @@ public class DataService {
 	@Autowired
 	DatabaseManager dbManager;
 	
-	public DQResultData executeQUery(String dbTypeName, String schemaName, 
-			DQQueryData leftData, DQQueryData rightData, int pageNumber, int recordCount) throws SQLException, ClassNotFoundException {
-		DataSource ds = dbManager.getDataSource(dbTypeName, schemaName);
+	private static final String DQTRAM = "DQTRAM";
+	private static final String DQTRM = "DQTRM";
+	
+	private static final Map<String, Map<String, TableImpl<?>>> jooqTableMap = new HashMap<>(); 
+	
+	static {
+		jooqTableMap.put(DQTRAM, new HashMap<>());
+		for (DQTRAM_TYPE type : DQTRAM_TYPE.values()) {
+			jooqTableMap.get(DQTRAM).put(type.name(), type.getJooqTable());
+		}
+		jooqTableMap.put(DQTRM, new HashMap<>());
+		for (DQTRM_TYPE type : DQTRM_TYPE.values()) {
+			jooqTableMap.get(DQTRM).put(type.name(), type.getJooqTable());
+		}
+	}
+	
+	public DQResultData executeQUery(String dbTypeName,
+			DQQueryData leftData, DQQueryData rightData, List<Join> outsideJoins, 
+			List<Where> outsideWhereList) throws SQLException, ClassNotFoundException {
+		System.out.println("Request - "+leftData);
+		DataSource ds = dbManager.getDataSource(dbTypeName, leftData.getSchema());
 		DB_TYPE dbType = DB_TYPE.getDbType(dbTypeName);
 		if(ds == null) {
-			throw new DQUtilityException("No datasource found for database "+dbTypeName+" and schema - "+schemaName);
+			throw new DQUtilityException("No datasource found for database "+dbTypeName+" and schema - "+leftData.getSchema());
 		}
-		DQResultData resultData = new DQResultData();
+
 		Connection conn = ds.getConnection();
 		DSLContext create = DSL.using(conn, dbType.getJooqSqlDialect());
-		List<SelectField<?>> selectFields = generateSelectionFields(leftData.selectColumns, schemaName);
-		int index = 1;
-		TableOnConditionStep<?> tableOnConditionStep = null;
-		for (Join joinColumn : leftData.getJoinColumns()) {
-			if("DQTRAM".equals(schemaName)) {
-				TableImpl<?> fromTble = DQTRAM_TYPE.valueOf(joinColumn.from.getTable()).getJooqTable();
-				TableImpl<?> toTble = DQTRAM_TYPE.valueOf(joinColumn.to.getTable()).getJooqTable();
-				if(tableOnConditionStep == null) {
-					tableOnConditionStep = fromTble.join(toTble).on(buildJoinCondition(schemaName, joinColumn.from, joinColumn.to));	
-				}else {
-					tableOnConditionStep.innerJoin(fromTble.join(toTble).on(buildJoinCondition(schemaName, joinColumn.from, joinColumn.to)));
-				}
-			}
-			if("DQTRM".equals(schemaName)) {
-				TableImpl<?> fromTble = DQTRM_TYPE.valueOf(joinColumn.from.getTable()).getJooqTable();
-				TableImpl<?> toTble = DQTRM_TYPE.valueOf(joinColumn.to.getTable()).getJooqTable();
-				if(tableOnConditionStep == null) {
-					tableOnConditionStep = fromTble.join(toTble).on(buildJoinCondition(schemaName, joinColumn.from, joinColumn.to));	
-				}else {
-					tableOnConditionStep.innerJoin(fromTble.join(toTble).on(buildJoinCondition(schemaName, joinColumn.from, joinColumn.to)));
-				}
-			}
-		}
+		List<SelectField<?>> selectLeftFields = generateSelectionFields(leftData.selectColumns, leftData.getSchema());
+		TableOnConditionStep<?> tableOnConditionStep = generateFromTableOnConditionStep(leftData);
 		
-		
-		SelectJoinStep<?> selectJoinStep = create.select(selectFields)
+		SelectJoinStep<?> selectLeftJoinStep = create.select(selectLeftFields)
 		.from(tableOnConditionStep);
 		
-		System.out.println("SQL - "+selectJoinStep.getSQL());
-		//List<Field<?>> resultFileds = buildResultFields(schemaName, leftData.getSelectColumns());
-		
-		selectJoinStep.limit(recordCount).offset(pageNumber);
-	
-		int count = retrieveCount(tableOnConditionStep, create);
-		resultData.setCount(count);
 		if(rightData == null) {
-			resultData.columnData = new HashMap<>();
-			for (SelectField<?> record : selectFields) {
-				if(!resultData.columnData.containsKey(record.getName())) {
-					resultData.columnData.put(record.getName(), selectJoinStep.fetch(record.getName()));
-				}
+			
+			return retrieveResultData(selectLeftFields, selectLeftJoinStep, selectLeftJoinStep, create,
+					leftData.getRecordCount(), leftData.getPageNumber());
+		}
+		
+		ds = dbManager.getDataSource(dbTypeName, rightData.getSchema());
+		conn = ds.getConnection();
+		create = DSL.using(conn, dbType.getJooqSqlDialect());
+		
+		List<SelectField<?>> selectRightFields = generateSelectionFields(rightData.selectColumns, rightData.getSchema());
+		tableOnConditionStep = generateFromTableOnConditionStep(rightData);
+		
+		SelectJoinStep<?> selectRightJoinStep = create.select(selectRightFields)
+		.from(tableOnConditionStep);
+
+		org.jooq.Table<?> leftTable = selectLeftJoinStep.asTable();
+		org.jooq.Table<?> rightTable = selectRightJoinStep.asTable();
+		
+		//leftTable.join(rightTable).on(((Field<String>)leftTable.field("")).eq((Field<String>) rightTable.field(""))))
+		Condition outsideJoinCondition = DSL.trueCondition();
+		TableOnStep<Record> joinTableStep = null;
+		JOIN_TYPE selectedJoin = null;
+		for (Join outJoin : outsideJoins) {
+			selectedJoin = outJoin.joinType;
+			if(joinTableStep == null) {
+				joinTableStep = setupOutOuterJoin(leftTable, rightTable, joinTableStep, outJoin);	
 			}
 			
-			//.join(addJoins(schemaName, leftData));
-			// If the rightData is null, just return the from here.
-			return resultData;
+			outsideJoinCondition.and(buildJoinCondition(outJoin.from.getSchema(), outJoin.from, outJoin.to, outJoin.condition));
 		}
-		/*
-		List<SelectField<?>> rightSelectFields = generateSelectionFields(rightData.selectColumns, schemaName);
-		List<TableLike<?>> rightTables = generateFromClause(rightData.tables, schemaName);
-		SelectJoinStep<?> rightJoinStep = create.select(rightSelectFields)
-				.from(rightTables);
-		rightJoinStep.join(addJoins(schemaName, rightData));
+		
+		joinTableStep.on(outsideJoinCondition);
+		Condition whereCondition = genrateWhereCondition(outsideWhereList);
+		TableOnConditionStep<Record> finalStepWithCondition = joinTableStep.on(whereCondition);
+		
+		SelectJoinStep<?> finalJoinStep = create.select()
+		.from(finalStepWithCondition);
+		
+		selectRightFields.addAll(selectLeftFields);
+		
+		DQResultData finalResult = retrieveResultData(selectRightFields, finalJoinStep, selectLeftJoinStep, create, leftData.getRecordCount(), leftData.getPageNumber());
+		SelectJoinStep<?> innerJoin = selectLeftJoinStep.innerJoin(selectRightJoinStep).on(DSL.trueCondition());
+		/*int srcCnt = retrieveCount(selectLeftJoinStep, create);
+		int trgtCnt = retrieveCount(selectRightJoinStep, create);
+		int innerCnt = retrieveCount(innerJoin, create);
+		if(selectedJoin == JOIN_TYPE.INNER) {
+			finalResult.setCount(innerCnt);
+		}
+		if(selectedJoin == JOIN_TYPE.LEFT_OUTER) {
+			finalResult.setCount(srcCnt - innerCnt);
+		}
+		if(selectedJoin == JOIN_TYPE.RIGHT_OUTER) {
+			finalResult.setCount(trgtCnt - innerCnt);
+		}*/
+		return finalResult;
+	}
+
+	private TableOnStep<Record> setupOutOuterJoin(org.jooq.Table<?> leftTable, org.jooq.Table<?> rightTable,
+			TableOnStep<Record> joinTableStep, Join outJoin) {
+		switch (outJoin.joinType) {
+		case INNER:
+			joinTableStep = leftTable.join(rightTable);
+			break;
+		case LEFT :
+			joinTableStep = leftTable.leftJoin(rightTable);
+			break;
+		case LEFT_OUTER:
+			joinTableStep = leftTable.leftOuterJoin(rightTable);
+			break;
+		case RIGHT:
+			joinTableStep = leftTable.rightJoin(rightTable);
+			break;
+		case RIGHT_OUTER:
+			joinTableStep = leftTable.rightOuterJoin(rightTable);
+			break;
+		case FULL_OUTER:
+			joinTableStep = leftTable.fullOuterJoin(rightTable);
+			break;
 			
-		//List<Field<?>> resultFileds = buildResultFields(schemaName, leftData.getSelectColumns());
-		selectJoinStep.leftJoin(rightJoinStep);*/
+		default:
+			break;
+		}
+		return joinTableStep;
+	}
+
+	private DQResultData retrieveResultData(List<SelectField<?>> selectLeftFields,
+			SelectJoinStep<?> selectJoinStep, SelectJoinStep<?> selectSrcJoinStep, DSLContext create, int recCount, int page) {
+		System.out.println("Final - Query - "+selectJoinStep);
+		DQResultData resultData = new DQResultData();
+		int count = retrieveCount(selectSrcJoinStep, create);
+		System.out.println("Total Retrieved records - "+count);
+		resultData.setCount(count );
+		selectJoinStep.limit(recCount).offset(page);
+		resultData.columnData = new HashMap<>();
+		for (SelectField<?> record : selectLeftFields) {
+			if(!resultData.columnData.containsKey(record.getName())) {
+				resultData.columnData.put(record.getName(), selectJoinStep.fetch(record.getName()));
+			}
+		}
 		
 		return resultData;
 	}
 
-	private int retrieveCount(TableOnConditionStep<?> tableOnConditionStep, DSLContext create) {
-				
-		SelectConditionStep<Record1<Integer>> countStep = create.selectCount()
-		.from(tableOnConditionStep).where(true);
-		
-		
-		return countStep.fetchOne(0, Integer.class);
+	private TableOnConditionStep<?> generateFromTableOnConditionStep(DQQueryData queryData) {
+		TableOnConditionStep<?> tableOnConditionStep = null;
+
+		for (Join joinColumn : queryData.getJoinColumns()) {
+			String fromTable = joinColumn.from.getTable().toUpperCase();
+			String toTable = joinColumn.to.getTable().toUpperCase();
+			String schemaName = queryData.schema.toUpperCase();
+			
+			TableImpl<?> fromTble = jooqTableMap.get(schemaName).get(fromTable);
+			TableImpl<?> toTble = jooqTableMap.get(schemaName).get(toTable);
+			
+			if (tableOnConditionStep == null) {
+				tableOnConditionStep = fromTble.join(toTble)
+						.on(buildJoinCondition(schemaName, joinColumn.from, joinColumn.to, com.dq.config.datasource.Condition.EQ));
+			} else {
+				tableOnConditionStep.innerJoin(
+						fromTble.join(toTble).on(buildJoinCondition(schemaName, joinColumn.from, joinColumn.to, com.dq.config.datasource.Condition.EQ)));
+			}
+		}
+		return tableOnConditionStep;
+	}
+
+	private int retrieveCount(SelectJoinStep<?> finalJoinStep, DSLContext create) {
+		System.out.println("Count - Query - "+finalJoinStep);
+			return	create.fetchCount(finalJoinStep);
 	}
 	
 	private List<Field<?>> buildResultFields(String schemaName, Map<String, List<Column>> selectColumns) {
@@ -137,13 +222,18 @@ public class DataService {
 	private TableOnConditionStep<Record> addJoins(String schemaName, DQQueryData leftData) {
 		TableOnConditionStep<Record> tableOnStep = null;
 		for (Join join : leftData.joins) {
-			if("DQTRAM".equals(schemaName)) {
+			TableImpl<?> fromTable = jooqTableMap.get(schemaName).get(join.from.getTable());
+			TableImpl<?> toTable = jooqTableMap.get(schemaName).get(join.to.getTable());
+			Condition condition = buildJoinCondition(schemaName, join.from, join.to, com.dq.config.datasource.Condition.EQ);
+			tableOnStep = fromTable.join(toTable).on(condition);
+			
+			/*if("DQTRAM".equals(schemaName)) {
 				DQTRAM_TYPE dqType = DQTRAM_TYPE.valueOf(join.from.getTable());
 				DQTRAM_TYPE toDqType = DQTRAM_TYPE.valueOf(join.to.getTable());
 				org.jooq.Table<?> fromTable = dqType.getJooqTable();
 				org.jooq.Table<?> toTable = toDqType.getJooqTable();
 				
-				Condition condition = buildJoinCondition(schemaName, join.from, join.to);
+				Condition condition = buildJoinCondition(schemaName, join.from, join.to, com.dq.config.datasource.Condition.EQ);
 				tableOnStep = fromTable.join(toTable).on(condition);
 				
 			}
@@ -153,60 +243,164 @@ public class DataService {
 				org.jooq.Table<?> fromTable = dqType.getJooqTable();
 				org.jooq.Table<?> toTable = toDqType.getJooqTable();
 				
-				Condition condition = buildJoinCondition(schemaName, join.from, join.to);
+				Condition condition = buildJoinCondition(schemaName, join.from, join.to, com.dq.config.datasource.Condition.EQ);
 				tableOnStep = fromTable.join(toTable).on(condition);
-			}
+			}*/
 		}
 		return tableOnStep;
 	}
 
-	private Condition buildJoinCondition(String schemaName, Column from, Column to) {
-		Condition condition = null;
-		if(!from.getType().equals(to.getType())) {
+	private Condition buildJoinCondition(String schemaName, Column from, Column to, com.dq.config.datasource.Condition joinCondition) {
+		Condition condition = DSL.trueCondition();
+		/*if(!from.getType().equals(to.getType())) {
 			throw new DQUtilityException("Incorrect join condition from "+from+" to "+to);
-		}
-		if("DQTRAM".equals(schemaName)) {
-			DQTRAM_TYPE fromDqType = DQTRAM_TYPE.valueOf(from.getTable());
-			DQTRAM_TYPE toDqType = DQTRAM_TYPE.valueOf(to.getTable());
-			if(from.getType().contains("String")) {
-				condition = ((Field<String>)fromDqType.field(from.getName(), String.class))
-								.eq((Field<String>)toDqType.field(to.getName(), String.class));
-			}
-			if(from.getType().contains("Integer")) {
-				condition = ((Field<Integer>)fromDqType.field(from.getName(), Integer.class))
-						.eq((Field<Integer>)toDqType.field(to.getName(), Integer.class));
-			}
-			if(from.getType().contains("Double")) {
-				condition = ((Field<Double>)fromDqType.field(from.getName(), Double.class))
-						.eq((Field<Double>)toDqType.field(to.getName(), Double.class));
-			}
-		}
-		if("DQTRM".equals(schemaName)) {
-			DQTRAM_TYPE fromDqType = DQTRAM_TYPE.valueOf(from.getTable());
-			DQTRAM_TYPE toDqType = DQTRAM_TYPE.valueOf(to.getTable());
-			if(from.getType().contains("String")) {
-				condition = ((Field<String>)fromDqType.field(from.getName(), String.class))
-								.eq((Field<String>)toDqType.field(to.getName(), String.class));
-			}
-			if(from.getType().contains("Integer")) {
-				condition = ((Field<Integer>)fromDqType.field(from.getName(), Integer.class))
-						.eq((Field<Integer>)toDqType.field(to.getName(), Integer.class));
-			}
-			if(from.getType().contains("Double")) {
-				condition = ((Field<Double>)fromDqType.field(from.getName(), Double.class))
-						.eq((Field<Double>)toDqType.field(to.getName(), Double.class));
+		}*/
+		TableImpl<?> fromTable = jooqTableMap.get(from.getSchema()).get(from.getTable());
+		TableImpl<?> toTable = jooqTableMap.get(to.getSchema()).get(to.getTable());
+		Field<String> fromStringField = null;
+		Field<String> toStringField = null;
+		Field<Integer> fromIntField = null;
+		Field<Integer> toIntField = null;
+		if(joinCondition == com.dq.config.datasource.Condition.EQ) {
+			if(!from.getType().equals(to.getType())) {
+				if(from.getType().contains("String")) {
+					fromIntField = ((Field<String>)fromTable.field(from.getName(), String.class)).cast(Integer.class);
+					toIntField = (Field<Integer>)toTable.field(to.getName(), Integer.class);
+				}else if(to.getType().contains("String")) {
+					toIntField = ((Field<String>)toTable.field(to.getName(), String.class)).cast(Integer.class);
+					fromIntField = (Field<Integer>)fromTable.field(from.getName(), Integer.class);
+				}
+				condition = fromIntField.eq(toIntField);
+			}else {
+				if(from.getType().contains("String")) {
+					condition = ((Field<String>)fromTable.field(from.getName(), String.class))
+									.eq((Field<String>)toTable.field(to.getName(), String.class));
+				}
+				if(from.getType().contains("Integer")) {
+					condition = ((Field<Integer>)fromTable.field(from.getName(), Integer.class))
+							.eq((Field<Integer>)toTable.field(to.getName(), Integer.class));
+				}
+				if(from.getType().contains("Double")) {
+					condition = ((Field<Double>)fromTable.field(from.getName(), Double.class))
+							.eq((Field<Double>)toTable.field(to.getName(), Double.class));
+				}
 			}	
 		}
+		
+		
+		/*if(joinCondition == com.dq.config.datasource.Condition.EQ) {
+			if(from.getType().contains("String")) {
+				condition = ((Field<String>)fromTable.field(from.getName(), String.class))
+								.eq((Field<String>)toTable.field(to.getName(), String.class));
+			}
+			if(from.getType().contains("Integer")) {
+				condition = ((Field<Integer>)fromTable.field(from.getName(), Integer.class))
+						.eq((Field<Integer>)toTable.field(to.getName(), Integer.class));
+			}
+			if(from.getType().contains("Double")) {
+				condition = ((Field<Double>)fromTable.field(from.getName(), Double.class))
+						.eq((Field<Double>)toTable.field(to.getName(), Double.class));
+			}
+		}*/
+		
 		return condition;
 	}
 
-	private List<Condition> genrateWhereCondition(List<Join> joins, String schemaName) {
-		List<Condition> conditions = new ArrayList<>();
-			for (Join join : joins) {
-				Condition condition = DSL.trueCondition();
-				//condition.
+	private Condition genrateWhereCondition(List<Where> outsideWhereList) {
+		Condition outsideWhereCondition = DSL.trueCondition();
+		for (Where where : outsideWhereList) {
+			TableImpl<?> table = jooqTableMap.get(where.column.getSchema()).get(where.column.getTable());
+			String whereFieldName = where.getColumn().getName();
+			String value = where.value;
+			switch (where.condition) {
+			case EQ:
+				if(where.column.getType().contains("Integer")) {
+					outsideWhereCondition.and(((Field<Integer>)table.field(whereFieldName, Integer.class))
+							.eq(Integer.parseInt(value)));	
+				}
+				if(where.column.getType().contains("Double")) {
+					outsideWhereCondition.and(((Field<Double>)table.field(whereFieldName, Double.class))
+							.eq(Double.parseDouble(value)));
+				}
+				else {
+					outsideWhereCondition.and(((Field<String>)table.field(whereFieldName, String.class))
+							.eq(value));
+				}
+				
+				break;
+
+			case NEQ:
+				if(where.column.getType().contains("Integer")) {
+					outsideWhereCondition.and(((Field<Integer>)table.field(whereFieldName, Integer.class))
+							.ne(Integer.parseInt(value)));	
+				}
+				if(where.column.getType().contains("Double")) {
+					outsideWhereCondition.and(((Field<Double>)table.field(whereFieldName, Double.class))
+							.ne(Double.parseDouble(value)));
+				}
+				else {
+					outsideWhereCondition.and(((Field<String>)table.field(whereFieldName, String.class))
+							.ne(value));
+				}
+				
+				break;
+
+			case GT:
+				if(where.column.getType().contains("Integer")) {
+					outsideWhereCondition.and(((Field<Integer>)table.field(whereFieldName, Integer.class))
+							.gt(Integer.parseInt(value)));	
+				}
+				if(where.column.getType().contains("Double")) {
+					outsideWhereCondition.and(((Field<Double>)table.field(whereFieldName, Double.class))
+							.gt(Double.parseDouble(value)));
+				}
+								
+				break;
+				
+			case GE:
+				if(where.column.getType().contains("Integer")) {
+					outsideWhereCondition.and(((Field<Integer>)table.field(whereFieldName, Integer.class))
+							.ge(Integer.parseInt(value)));	
+				}
+				if(where.column.getType().contains("Double")) {
+					outsideWhereCondition.and(((Field<Double>)table.field(whereFieldName, Double.class))
+							.ge(Double.parseDouble(value)));
+				}				
+				break;
+
+			case LT:
+				if(where.column.getType().contains("Integer")) {
+					outsideWhereCondition.and(((Field<Integer>)table.field(whereFieldName, Integer.class))
+							.lt(Integer.parseInt(value)));	
+				}
+				if(where.column.getType().contains("Double")) {
+					outsideWhereCondition.and(((Field<Double>)table.field(whereFieldName, Double.class))
+							.lt(Double.parseDouble(value)));
+				}
+				
+				break;
+			case LE:
+				if(where.column.getType().contains("Integer")) {
+					outsideWhereCondition.and(((Field<Integer>)table.field(whereFieldName, Integer.class))
+							.le(Integer.parseInt(value)));	
+				}
+				if(where.column.getType().contains("Double")) {
+					outsideWhereCondition.and(((Field<Double>)table.field(whereFieldName, Double.class))
+							.le(Double.parseDouble(value)));
+				}
+				
+				break;
+			case IS:
+				
+				outsideWhereCondition.and(((Field<String>)table.field(whereFieldName, String.class))
+						.eq(value));
+				
+				break;
+			default:
+				break;
 			}
-		return conditions;
+		}
+		return outsideWhereCondition;
 	}
 
 	/*private List<TableLike<?>> generateFromClause(List<String> tables, String schemaName) {
@@ -227,18 +421,15 @@ public class DataService {
 		return tableLikes;
 	}*/
 
-	private List<SelectField<?>> generateSelectionFields(Map<String, List<Column>> selectColumns, String schemaName) throws ClassNotFoundException {
+	private List<SelectField<?>> generateSelectionFields(List<Column> selectColumns, String schemaName)
+			throws ClassNotFoundException {
 		List<SelectField<?>> selectFieldList = new ArrayList<>();
-		if(MapUtils.isNotEmpty(selectColumns)) {
-			for (String tableName : selectColumns.keySet()) {
-				if("DQTRAM".equals(schemaName)) {
-					DQTRAM_TYPE dqType = DQTRAM_TYPE.valueOf(tableName);
-					for (Column column : selectColumns.get(tableName)) {
-						selectFieldList.add(dqType.field(column.getName(), Class.forName(column.getType())));
-					}
-				}		
-			}
+
+		for (Column column : selectColumns) {
+			TableImpl<?> table = jooqTableMap.get(column.getSchema()).get(column.getTable());
+			selectFieldList.add(table.field(column.getName(), Class.forName(column.getType())));
 		}
+
 		return selectFieldList;
 	}
 	
@@ -251,6 +442,7 @@ public class DataService {
 	amSerNum.setName("AM_SER_NUM");
 	amSerNum.setTable("TRAM_AM");
 	amSerNum.setType("java.lang.Integer");
+	amSerNum.setSchema("DQTRAM");
 	amColumns.add(amSerNum );
 	columnMap.put("TRAM_AM", amColumns );
 	
@@ -259,6 +451,7 @@ public class DataService {
 	wpColumn.setName("WP_WIPO_CD");
 	wpColumn.setTable("TRAM_WP");
 	wpColumn.setType("java.lang.String");
+	wpColumn.setSchema("DQTRAM");
 	wpColumns.add(wpColumn );
 	
 	wpColumn = new Column();
@@ -266,6 +459,7 @@ public class DataService {
 	wpColumn.setTable("TRAM_WP");
 	wpColumn.setType("java.lang.Integer");
 	wpColumns.add(wpColumn );
+	wpColumn.setSchema("DQTRAM");
 	columnMap.put("TRAM_WP", wpColumns );
 	
 	List<String> tableList = new ArrayList<>();
@@ -286,10 +480,13 @@ public class DataService {
 	leftData.setSelectColumns(columnMap );
 	leftData.setTables(tableList);
 	leftData.setJoinColumns(joinColumnList);
+	leftData.setSchema("DQTRAM");
 	
 	Gson gson = new Gson();
 	System.out.println("JSON - "+gson.toJson(leftData));
 	
-	service.executeQUery("mysql", "DQTRAM", leftData , null, 1, 10);
+	//service.executeQUery("mysql", "DQTRAM", leftData , null, 1, 10,null,null,null);
+	service.executeQUery("mysql", leftData, null, null, null, null);
 }*/
+	
 }

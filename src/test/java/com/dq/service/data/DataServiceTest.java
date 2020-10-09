@@ -85,10 +85,10 @@ public class DataServiceTest {
 	
 	@Test
 	public void testGetData() throws Exception {
-		String request = "{\"selectColumns\":{\"TRAM_WP\":[{\"name\":\"WP_WIPO_CD\",\"type\":\"java.lang.String\",\"table\":\"TRAM_WP\"},{\"name\":\"WP_RSN\",\"type\":\"java.lang.Integer\",\"table\":\"TRAM_WP\"}],\"TRAM_AM\":[{\"name\":\"AM_SER_NUM\",\"type\":\"java.lang.Integer\",\"table\":\"TRAM_AM\"}]},\"tables\":[\"TRAM_AM\",\"TRAM_WP\"],\"joins\":[{\"joinType\":\"INNER\",\"from\":{\"name\":\"WP_SER_NUM\",\"type\":\"java.lang.Integer\",\"table\":\"TRAM_WP\"},\"to\":{\"name\":\"AM_SER_NUM\",\"type\":\"java.lang.Integer\",\"table\":\"TRAM_AM\"},\"condition\":\"EQ\"}]}";
+		String request = "{\"selectColumns\":{\"TRAM_WP\":[{\"name\":\"WP_WIPO_CD\",\"type\":\"java.lang.String\",\"table\":\"TRAM_WP\"},{\"name\":\"WP_RSN\",\"type\":\"java.lang.Integer\",\"table\":\"TRAM_WP\"}],\"TRAM_AM\":[{\"name\":\"AM_SER_NUM\",\"type\":\"java.lang.Integer\",\"table\":\"TRAM_AM\"}]},\"tables\":[\"TRAM_AM\",\"TRAM_WP\"],\"joins\":[{\"joinType\":\"INNER\",\"from\":{\"name\":\"WP_SER_NUM\",\"type\":\"java.lang.Integer\",\"table\":\"TRAM_WP\"},\"to\":{\"name\":\"AM_SER_NUM\",\"type\":\"java.lang.Integer\",\"table\":\"TRAM_AM\"},\"condition\":\"EQ\"}],\"schema\": \"DQTRAM\", \"recordCount\": 50, \"pageNumber\": 1}";
 		Gson gson = new Gson();
 		DQQueryData leftData = gson.fromJson(request, DQQueryData.class);
-		DQResultData result = service.executeQUery("mysql", "DQTRAM", leftData, null, 1, 50);
+		DQResultData result = service.executeQUery("mysql",  leftData, null, null, null);
 		System.out.println("Result count - "+result.getCount());
 		System.out.println("Result Data ----------- ");
 		for (String columnName : result.getColumnData().keySet()) {

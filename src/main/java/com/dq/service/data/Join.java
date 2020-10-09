@@ -11,6 +11,7 @@ public class Join {
 	Column from;
 	Column to;
 	Condition condition;
+	
 	public JOIN_TYPE getJoinType() {
 		return joinType;
 	}
@@ -35,4 +36,9 @@ public class Join {
 	public void setCondition(Condition condition) {
 		this.condition = condition;
 	}
+	@Override
+	public String toString() {
+		return "Join [joinType=" + joinType + ", from=" + from + ", to=" + to + ", condition=" + condition + "]";
+	}
+	
 }

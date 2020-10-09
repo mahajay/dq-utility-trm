@@ -7,14 +7,18 @@ import com.dq.service.metadata.Column;
 
 public class DQQueryData {
 
-	Map<String, List<Column>> selectColumns;
+	List<Column> selectColumns;
 	List<String> tables;
 	List<Join> joins;
+	List<Where> wheres;
+	String schema;
+	int pageNumber;
+	int recordCount;
 
-	public Map<String, List<Column>> getSelectColumns() {
+	public List<Column> getSelectColumns() {
 		return selectColumns;
 	}
-	public void setSelectColumns(Map<String, List<Column>> selectColumns) {
+	public void setSelectColumns(List<Column> selectColumns) {
 		this.selectColumns = selectColumns;
 	}
 	public List<String> getTables() {
@@ -29,6 +33,39 @@ public class DQQueryData {
 	public void setJoinColumns(List<Join> joinColumns) {
 		this.joins = joinColumns;
 	}
-	
-	
+	public List<Join> getJoins() {
+		return joins;
+	}
+	public void setJoins(List<Join> joins) {
+		this.joins = joins;
+	}
+	public String getSchema() {
+		return schema;
+	}
+	public void setSchema(String schema) {
+		this.schema = schema;
+	}
+	public int getPageNumber() {
+		return pageNumber;
+	}
+	public void setPageNumber(int pageNumber) {
+		this.pageNumber = pageNumber;
+	}
+	public int getRecordCount() {
+		return recordCount;
+	}
+	public void setRecordCount(int recordCount) {
+		this.recordCount = recordCount;
+	}
+	public List<Where> getWheres() {
+		return wheres;
+	}
+	public void setWheres(List<Where> wheres) {
+		this.wheres = wheres;
+	}
+	@Override
+	public String toString() {
+		return "DQQueryData [selectColumns=" + selectColumns + ", tables=" + tables + ", joins=" + joins + ", wheres="
+				+ wheres + ", schema=" + schema + ", pageNumber=" + pageNumber + ", recordCount=" + recordCount + "]";
+	}
 }
